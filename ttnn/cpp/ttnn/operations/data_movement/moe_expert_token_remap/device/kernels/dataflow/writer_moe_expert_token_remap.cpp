@@ -126,4 +126,8 @@ void kernel_main() {
     // writes before the kernel returns so the downstream op can't read not-yet-landed output.
     noc.async_write_barrier();
     local_experts_dfb.pop_front(1);
+    output_mapping_dfb.wait_front(1);
+    output_mapping_dfb.pop_front(1);
+    output_reduced_dfb.wait_front(1);
+    output_reduced_dfb.pop_front(1);
 }

@@ -198,8 +198,9 @@ void kernel_main() {
 
     dfb_partial_recv.push_back(num_senders);
 
-    // 3. Wait for compute to produce logit output (topk_val).
+    // 3. Wait for compute to produce logit output (topk_val) and generated index tile.
     dfb_topk_val.wait_front(1);
+    dfb_index.wait_front(1);
 
     if (!is_collector) {
         // Non-collector worker: send logit+index tiles to collector

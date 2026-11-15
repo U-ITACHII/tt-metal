@@ -47,9 +47,14 @@ void kernel_main() {
     auto local_weight_idx_ptr = reinterpret_cast<volatile tt_l1_ptr uint16_t*>(local_weights_idxs_l1_addr);
 
     noc.async_read_barrier();
-    for (uint32_t i = 0, weight_offset_count = 0, device_weights_count = 0; i < num_cluster_experts; ++i) {
-        const auto& val = routing_weights_ptr[i];
-        if (val != 0) {
+    constexpr weight_addr_t magnitude_mask =
+        (weight_datum_size_bytes == 2) ? static_cast<weight_addr_t>(0x7FFFu)
+                                       : ((weight_datum_size_bytes == 4) ? static_cast<weight_addr_t>(0x7FFFFFFFu)
+                                                                         : static_cast<weight_addr_t>(~weight_addr_t{0}));
+    uint32_t device_weights_count = 0;
+    for (uint32_t i = 0, weight_offset_count = 0; i < num_cluster_experts; ++i) {
+        const weight_addr_t val = routing_weights_ptr[i];
+        if ((val & magnitude_mask) != 0) {
             if (weight_offset_count < device_weights_count_offset) {
                 ++weight_offset_count;
             } else {
@@ -59,6 +64,9 @@ void kernel_main() {
         if (device_weights_count == num_non_zero_per_device) {
             break;
         }
+    }
+    for (; device_weights_count < num_non_zero_per_device; ++device_weights_count) {
+        local_weight_idx_ptr[device_weights_count] = 0xFFFFu;
     }
     routing_weights_dfb.push_back(1);
     local_weights_idxs_dfb.push_back(1);

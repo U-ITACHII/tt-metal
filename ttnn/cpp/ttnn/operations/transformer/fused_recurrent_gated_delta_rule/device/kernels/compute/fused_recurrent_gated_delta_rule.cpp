@@ -222,6 +222,10 @@ void kernel_main() {
         mm(cb_q, nxt_S_id, cb_out, 1, Kt, Vt, false);
         q.pop_front(Kt);
 
-        // nxt_S is intentionally NOT popped: the next iteration reads it as cur_S.
+        // On intermediate steps, nxt_S stays pushed so iteration t + 1 consumes it as cur_S;
+        // on the final token step, pop nxt_S so no tiles remain stranded at kernel exit.
+        if (last) {
+            nxt_S.pop_front(kv);
+        }
     }
 }

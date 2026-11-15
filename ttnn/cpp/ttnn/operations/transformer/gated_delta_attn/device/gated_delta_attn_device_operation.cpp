@@ -12,30 +12,39 @@ using namespace tt::tt_metal;
 
 namespace ttnn::prim {
 
-static void validate_tensor(const Tensor& t, const std::string& name) {
+static void validate_tensor(const Tensor& t, const std::string& name, IDevice* expected_device) {
     TT_FATAL(t.storage_type() == StorageType::DEVICE, "{} must be on device", name);
     TT_FATAL(t.is_allocated(), "{} must be allocated", name);
+    TT_FATAL(t.device() == expected_device, "{} must be on the same device as L_unit", name);
     TT_FATAL(t.memory_config().buffer_type() == BufferType::DRAM, "{} must be in DRAM", name);
+    TT_FATAL(!t.is_sharded(), "{} must be interleaved, not sharded", name);
     TT_FATAL(t.layout() == Layout::TILE, "{} must be tiled", name);
     TT_FATAL(t.dtype() == DataType::FLOAT32, "{} must be float32, got {}", name, t.dtype());
 }
 
 void GatedDeltaAttnSeqDeviceOperation::validate_on_program_cache_miss(
     const operation_attributes_t& attrs, const tensor_args_t& in) {
-    validate_tensor(in.L_unit, "L_unit");
-    validate_tensor(in.v_beta_sc, "v_beta_sc");
-    validate_tensor(in.k_bd_sc, "k_bd_sc");
-    validate_tensor(in.intra_attn, "intra_attn");
-    validate_tensor(in.q_decay, "q_decay");
-    validate_tensor(in.k_decay_t, "k_decay_t");
-    validate_tensor(in.dl_exp, "dl_exp");
-    validate_tensor(in.L_inv, "L_inv");
+    auto* expected_device = in.L_unit.device();
+    validate_tensor(in.L_unit, "L_unit", expected_device);
+    validate_tensor(in.v_beta_sc, "v_beta_sc", expected_device);
+    validate_tensor(in.k_bd_sc, "k_bd_sc", expected_device);
+    validate_tensor(in.intra_attn, "intra_attn", expected_device);
+    validate_tensor(in.q_decay, "q_decay", expected_device);
+    validate_tensor(in.k_decay_t, "k_decay_t", expected_device);
+    validate_tensor(in.dl_exp, "dl_exp", expected_device);
+    validate_tensor(in.L_inv, "L_inv", expected_device);
     if (in.initial_state.has_value()) {
-        validate_tensor(*in.initial_state, "initial_state");
+        validate_tensor(*in.initial_state, "initial_state", expected_device);
     }
+
+    TT_FATAL(
+        attrs.output_mem_config.buffer_type() == BufferType::DRAM && !attrs.output_mem_config.is_sharded(),
+        "output_mem_config must be interleaved DRAM");
 
     const uint32_t BH = attrs.num_heads;
     const uint32_t NC = attrs.num_chunks;
+    TT_FATAL(BH >= 1, "num_heads (BH) must be >= 1, got {}", BH);
+    TT_FATAL(NC >= 1, "num_chunks (NC) must be >= 1, got {}", NC);
     const uint32_t C = attrs.chunk_size;
     const uint32_t Dk = attrs.key_dim;
     const uint32_t Dv = attrs.val_dim;

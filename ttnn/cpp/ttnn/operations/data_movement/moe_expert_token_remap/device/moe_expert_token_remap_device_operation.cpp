@@ -53,6 +53,16 @@ void MoeExpertTokenRemapDeviceOperation::validate_on_program_cache_miss(
         "Expected metadata dim 1 to be equal to topk dim 1 (batch size), got {} and {}, respectively",
         metadata_shape[1],
         topk_shape[1]);
+    TT_FATAL(
+        metadata_shape[2] == topk_shape[2],
+        "Expected metadata dim 2 to be equal to topk dim 2 (seq size), got {} and {}, respectively",
+        metadata_shape[2],
+        topk_shape[2]);
+    TT_FATAL(
+        num_devices > 0 && mapping_shape[-2] % num_devices == 0,
+        "Number of experts ({}) must be evenly divisible by num_devices ({})",
+        mapping_shape[-2],
+        num_devices);
 
     const uint32_t batch_seq = metadata_shape[1] * metadata_shape[2];
     const auto reduction_size = operation_attributes.reduction_size;
@@ -63,6 +73,22 @@ void MoeExpertTokenRemapDeviceOperation::validate_on_program_cache_miss(
         "every reduction_size metadata pages and does not flush a partial trailing group",
         batch_seq,
         reduction_size);
+
+    const auto expected_specs = compute_output_specs(operation_attributes, tensor_args);
+    if (tensor_args.optional_output_mapping_tensor.has_value()) {
+        TT_FATAL(
+            tensor_args.optional_output_mapping_tensor->tensor_spec() == expected_specs[0],
+            "optional_output_mapping_tensor spec {} does not match expected spec {}",
+            tensor_args.optional_output_mapping_tensor->tensor_spec(),
+            expected_specs[0]);
+    }
+    if (tensor_args.optional_output_reduced_tensor.has_value()) {
+        TT_FATAL(
+            tensor_args.optional_output_reduced_tensor->tensor_spec() == expected_specs[1],
+            "optional_output_reduced_tensor spec {} does not match expected spec {}",
+            tensor_args.optional_output_reduced_tensor->tensor_spec(),
+            expected_specs[1]);
+    }
 }
 
 MoeExpertTokenRemapDeviceOperation::spec_return_value_t MoeExpertTokenRemapDeviceOperation::compute_output_specs(

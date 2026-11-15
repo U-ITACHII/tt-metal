@@ -142,6 +142,9 @@ void kernel_main() {
     tile_regs_commit();
     dfb_topk_val.reserve_back(1);
     tile_regs_wait();
+#ifdef ARCH_QUASAR
+    pack_init(dfb::topk_val);
+#endif
     pack_tile(0, dfb::topk_val);
     tile_regs_release();
     dfb_topk_val.push_back(1);
@@ -247,7 +250,7 @@ void kernel_main() {
     tile_regs_acquire();
     reduce_init<PoolType::MAX, ReduceDim::REDUCE_ROW>(dfb::softmax_tmp, dfb::bcast_scaler, dfb::reduce_scalar);
     reduce_tile<PoolType::MAX, ReduceDim::REDUCE_ROW>(dfb::softmax_tmp, dfb::bcast_scaler, 0, 0, 0);
-    reduce_uninit(dfb::reduce_scalar);
+    reduce_uninit(dfb::softmax_tmp);
     tile_regs_commit();
 
     tile_regs_wait();
@@ -282,7 +285,7 @@ void kernel_main() {
     reconfig_data_format(dfb::bcast_scaler, dfb::softmax_tmp);
     reduce_init<PoolType::SUM, ReduceDim::REDUCE_ROW>(dfb::softmax_tmp, dfb::bcast_scaler, dfb::reduce_scalar);
     reduce_tile<PoolType::SUM, ReduceDim::REDUCE_ROW>(dfb::softmax_tmp, dfb::bcast_scaler, 0, 0, 0);
-    reduce_uninit(dfb::reduce_scalar);
+    reduce_uninit(dfb::softmax_tmp);
     recip_tile_init();
     recip_tile(0);
     tile_regs_commit();

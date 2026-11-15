@@ -306,6 +306,8 @@ GatedDeltaAttnSeqDeviceOperation::GatedDeltaAttnSeqProgramFactory::create_progra
             },
     };
 
+    auto [math_fidelity, math_approx_mode, fp32_dest_acc_en, packer_l1_acc, dst_full_sync_en] =
+        get_compute_kernel_config_args(device->arch(), attrs.compute_kernel_config);
     KernelSpec compute{
         .unique_id = COMPUTE,
         .source = kdir + "compute/gated_delta_attn.cpp",
@@ -316,9 +318,10 @@ GatedDeltaAttnSeqDeviceOperation::GatedDeltaAttnSeqProgramFactory::create_progra
         .runtime_arg_schema = {.runtime_arg_names = {"num_chunks"}},
         .hw_config =
             ComputeHardwareConfig{
-                .fpu_math_fidelity = MathFidelity::HiFi2,
-                .sfpu_precision_mode = Precision::Precise,
-                .enable_32_bit_dest = true,
+                .fpu_math_fidelity = math_fidelity,
+                .sfpu_precision_mode = math_approx_mode ? Precision::Approximate : Precision::Precise,
+                .enable_32_bit_dest = fp32_dest_acc_en,
+                .double_buffer_dest = !dst_full_sync_en,
                 .unpack_modes = unpack_modes,
             },
     };

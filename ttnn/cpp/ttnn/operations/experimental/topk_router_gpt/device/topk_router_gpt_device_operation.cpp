@@ -66,7 +66,10 @@ void TopkRouterGptDeviceOperation::validate_on_program_cache_miss(
         input.padded_shape()[0] == 32,
         "topk_router_gpt requires one physical 32-row input tile, got padded batch size {}",
         input.padded_shape()[0]);
-    TT_FATAL(hidden_dim % 32 == 0, "Input hidden_dim must be divisible by 32 (tile size), got {}", hidden_dim);
+    TT_FATAL(
+        hidden_dim >= 32 && hidden_dim % 32 == 0,
+        "Input hidden_dim must be a positive multiple of 32 (tile size), got {}",
+        hidden_dim);
 
     // Validate weight shape: [hidden_dim, num_experts]
     auto weight_shape = weight.logical_shape();

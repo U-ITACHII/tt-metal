@@ -89,7 +89,6 @@ TopkRouterGptDeviceOperation::TopkRouterGptProgramFactory::create_program_artifa
     const auto dram_bank2core_coords =
         device->get_optimal_dram_bank_to_logical_worker_assignment(tt::tt_metal::NOC::RISCV_0_default);
     const uint32_t num_cores = dram_bank2core_coords.size();
-    auto all_cores = tt::tt_metal::CoreRangeSet(dram_bank2core_coords);
 
     constexpr uint32_t num_groups = 4;
     // Wormhole exposes 12 DRAM-aligned workers and uses two senders per
@@ -163,6 +162,15 @@ TopkRouterGptDeviceOperation::TopkRouterGptProgramFactory::create_program_artifa
             }
             return pa.x > pb.x;
         });
+
+    // Restrict target_nodes to the required_cores active ring cores so extra DRAM-bank cores
+    // are never launched with default/zero runtime arguments.
+    std::vector<CoreCoord> active_core_coords;
+    active_core_coords.reserve(required_cores);
+    for (uint32_t ring_pos = 0; ring_pos < required_cores; ring_pos++) {
+        active_core_coords.push_back(dram_bank2core_coords[ring_pos2bank_id[ring_pos]]);
+    }
+    auto all_cores = tt::tt_metal::CoreRangeSet(active_core_coords);
 
     // Map ring positions to group roles
     const uint32_t collector_ring_pos = num_senders;
